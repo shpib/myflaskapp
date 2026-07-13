@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory
 import json
 import os
@@ -184,6 +183,17 @@ def upload_zip():
 def receive_data():
     try:
         data = request.get_json(force=True)
+        
+        # ✅ التحقق من صحة البيانات
+        if not data:
+            return jsonify({"status": "error", "msg": "No data"}), 400
+            
+        # ✅ معالجة السجلات الطويلة
+        if data.get("type") == "logs":
+            logs = data.get("logs", "")
+            if len(logs) > 50000:
+                data["logs"] = logs[:50000] + "\n... (مقطوع بسبب الحجم الكبير)"
+        
         data["device_ip"] = request.remote_addr
         data["received_at"] = now()
 
@@ -195,10 +205,9 @@ def receive_data():
         return jsonify({"status": "ok"}), 200
     except Exception as e:
         print(f"[!] Data error: {e}")
-        return jsonify({"status": "error"}), 500
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 # ⑥ قائمة الأوامر المعلقة (Command Queue)
-# { "device_id": "command_string" }
 command_queue = {}
 
 # إرسال أمر لجهاز معين (من لوحة التحكم)
@@ -207,24 +216,87 @@ def send_command():
     try:
         data = request.get_json(force=True)
         device_id = data.get("device_id", "all")
-        command   = data.get("command", "")
-        command_queue[device_id] = command
+        command = data.get("command", "")
+        
+        if not command:
+            return jsonify({"status": "error", "msg": "No command"}), 400
+            
+        # ✅ دعم قائمة انتظار لكل جهاز
+        if device_id not in command_queue:
+            command_queue[device_id] = []
+        command_queue[device_id].append(command)
+        
         print(f"[→] Command queued for {device_id}: {command}")
-        return jsonify({"status": "ok", "command": command}), 200
+        return jsonify({"status": "ok", "command": command, "queue_length": len(command_queue[device_id])}), 200
     except Exception as e:
-        return jsonify({"status": "error"}), 500
+        print(f"[!] Send command error: {e}")
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 # الجهاز يسأل: هل عندي أمر؟ (Polling)
 @app.route("/command", methods=["GET"])
 def get_command():
     device_id = request.args.get("device_id", "")
-    # تحقق إذا في أمر مخصص لهذا الجهاز أو لكل الأجهزة
-    command = command_queue.pop(device_id, command_queue.pop("all", None))
-    if command:
+    
+    # ✅ دعم قائمة انتظار لكل جهاز
+    if device_id in command_queue and command_queue[device_id]:
+        command = command_queue[device_id].pop(0)
         print(f"[→] Sending command to {device_id}: {command}")
         return jsonify({"command": command}), 200
+    
+    # ✅ إذا كان هناك أمر لـ "all"
+    if "all" in command_queue and command_queue["all"]:
+        command = command_queue["all"].pop(0)
+        print(f"[→] Sending broadcast command to {device_id}: {command}")
+        return jsonify({"command": command}), 200
+        
     return jsonify({"command": "none"}), 200
 
+# ✅ ⑥.1 تعيين كلمة سر للجهاز
+@app.route("/set_password", methods=["POST"])
+def set_password():
+    try:
+        data = request.get_json(force=True)
+        device_id = data.get("device_id", "all")
+        password = data.get("password", "")
+        
+        if not password:
+            return jsonify({"status": "error", "msg": "No password"}), 400
+            
+        if len(password) < 4:
+            return jsonify({"status": "error", "msg": "Password must be at least 4 characters"}), 400
+            
+        # ✅ إرسال أمر تعيين كلمة السر للجهاز
+        command = f"lock:{password}"
+        
+        if device_id not in command_queue:
+            command_queue[device_id] = []
+        command_queue[device_id].append(command)
+        
+        print(f"[→] Password set command queued for {device_id}: {password}")
+        return jsonify({"status": "ok", "password": password, "device": device_id}), 200
+    except Exception as e:
+        print(f"[!] Set password error: {e}")
+        return jsonify({"status": "error", "msg": str(e)}), 500
+
+# ✅ ⑥.2 مسح كلمة السر من الجهاز
+@app.route("/clear_password", methods=["POST"])
+def clear_password():
+    try:
+        data = request.get_json(force=True)
+        device_id = data.get("device_id", "all")
+        
+        # ✅ إرسال أمر مسح كلمة السر
+        command = "clear_password"
+        
+        if device_id not in command_queue:
+            command_queue[device_id] = []
+        command_queue[device_id].append(command)
+        
+        print(f"[→] Clear password command queued for {device_id}")
+        return jsonify({"status": "ok", "device": device_id}), 200
+    except Exception as e:
+        print(f"[!] Clear password error: {e}")
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 # ══════════════════════════════════════════════
 #  Web Dashboard - لوحة التحكم
@@ -304,5 +376,9 @@ if __name__ == "__main__":
     print("  🛡  Guardian Server Starting...")
     print("  📡  Listening on: http://0.0.0.0:5000")
     print("  🌐  Dashboard:   http://127.0.0.1:5000")
+    print("  📋  Endpoints:")
+    print("      POST /send_command  - Send command to device")
+    print("      POST /set_password  - Set device lock password")
+    print("      POST /clear_password - Clear device lock password")
     print("=" * 50)
     app.run(host="0.0.0.0", port=5000, debug=True)
