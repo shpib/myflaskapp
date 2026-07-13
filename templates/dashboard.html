@@ -213,6 +213,7 @@
   .badge-cyan   { background:rgba(0,229,255,0.15); color:var(--cyan); }
   .badge-purple { background:rgba(124,77,255,0.15); color:var(--purple); }
   .badge-red    { background:rgba(255,82,82,0.15);  color:var(--red); }
+  .badge-orange { background:rgba(255,109,0,0.15); color:var(--orange); }
 
   .two-col { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 
@@ -299,6 +300,15 @@
     background:rgba(124,77,255,0.25);
     border-color:var(--purple);
     transform:scale(1.05);
+  }
+
+  /* ── Password Card Styles ── */
+  .password-card {
+    border-color: var(--orange) !important;
+    margin-bottom: 24px;
+  }
+  .password-card .card-header {
+    border-bottom-color: rgba(255,109,0,0.2) !important;
   }
 
   @media(max-width:900px) {
@@ -464,6 +474,88 @@
     </div>
   </div>
 
+  <!-- ── PASSWORD SETTINGS ── -->
+  <div class="card password-card">
+    <div class="card-header">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">🔑</span> إدارة كلمة سر الجهاز
+      </span>
+      <span class="badge badge-orange">Security</span>
+    </div>
+    <div style="padding: 20px;">
+      <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+        
+        <!-- اختيار الجهاز -->
+        <div style="flex:1; min-width:150px;">
+          <label style="display:block; font-size:11px; color:var(--text3); margin-bottom:4px;">
+            📱 اختر الجهاز
+          </label>
+          <select id="passwordDeviceSelect" class="cmd-select">
+            <option value="all">🌐 جميع الأجهزة</option>
+            {% if devices %}
+              {% for d in devices %}
+              <option value="{{ d.get('id', d.get('model', 'unknown')) }}">
+                {{ d.get('model', 'جهاز') }}
+              </option>
+              {% endfor %}
+            {% else %}
+              <option value="all" disabled>⚠️ لا توجد أجهزة</option>
+            {% endif %}
+          </select>
+        </div>
+
+        <!-- كلمة السر -->
+        <div style="flex:1; min-width:150px;">
+          <label style="display:block; font-size:11px; color:var(--text3); margin-bottom:4px;">
+            🔑 كلمة السر الجديدة
+          </label>
+          <input type="text" id="passwordInput" class="cmd-input" placeholder="مثال: 1234" value="1234">
+        </div>
+
+        <!-- تأكيد كلمة السر -->
+        <div style="flex:1; min-width:150px;">
+          <label style="display:block; font-size:11px; color:var(--text3); margin-bottom:4px;">
+            ✅ تأكيد كلمة السر
+          </label>
+          <input type="text" id="passwordConfirm" class="cmd-input" placeholder="تأكيد كلمة السر" value="1234">
+        </div>
+
+        <!-- أزرار الإجراءات -->
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button onclick="setPassword()" style="
+            padding:10px 24px; border-radius:10px; border:none;
+            background: linear-gradient(135deg, var(--orange), var(--red));
+            color:#fff; font-weight:700; font-size:13px;
+            cursor:pointer; transition:transform 0.2s, opacity 0.2s;
+            display:flex; align-items:center; gap:8px;
+          ">
+            <span>🔑</span> تعيين كلمة السر
+          </button>
+          <button onclick="clearPassword()" style="
+            padding:10px 24px; border-radius:10px; border:none;
+            background: linear-gradient(135deg, var(--red), #880000);
+            color:#fff; font-weight:700; font-size:13px;
+            cursor:pointer; transition:transform 0.2s, opacity 0.2s;
+            display:flex; align-items:center; gap:8px;
+          ">
+            <span>🗑️</span> مسح كلمة السر
+          </button>
+        </div>
+
+      </div>
+
+      <!-- منطقة عرض النتيجة -->
+      <div id="passwordResponse" class="cmd-response"></div>
+
+      <!-- تعليمات -->
+      <div style="margin-top:12px; padding:10px 16px; background:rgba(255,109,0,0.08); border-radius:8px; border-right:3px solid var(--orange);">
+        <p style="font-size:12px; color:var(--text2);">
+          💡 <strong>ملاحظة:</strong> يجب أن تكون كلمة السر <strong>4 أحرف على الأقل</strong>. سيتم قفل الجهاز فوراً بعد تعيين كلمة السر.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- Two columns -->
   <div class="two-col">
 
@@ -563,11 +655,9 @@
       return;
     }
 
-    // إظهار حالة التحميل
     responseDiv.className = 'cmd-response loading';
     responseDiv.innerHTML = '⏳ جاري إرسال الأمر...';
 
-    // إرسال الطلب
     fetch('/send_command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -582,7 +672,6 @@
         responseDiv.className = 'cmd-response success';
         responseDiv.innerHTML = `✅ تم إرسال الأمر <strong>"${command}"</strong> إلى <strong>${device}</strong> بنجاح`;
         document.getElementById('commandInput').value = '';
-        // إخفاء الرسالة بعد 5 ثواني
         setTimeout(() => {
           responseDiv.className = 'cmd-response';
           responseDiv.innerHTML = '';
@@ -602,16 +691,112 @@
     sendCommand();
   }
 
-  // إرسال الأمر بالضغط على Enter
   document.getElementById('commandInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') sendCommand();
   });
 
-  // اختيار الجهاز الأول تلقائياً إذا كان هناك جهاز واحد فقط
+  // ── Password Functions ──
+  function setPassword() {
+    const device = document.getElementById('passwordDeviceSelect').value;
+    const password = document.getElementById('passwordInput').value.trim();
+    const confirm = document.getElementById('passwordConfirm').value.trim();
+    const responseDiv = document.getElementById('passwordResponse');
+
+    if (!password || !confirm) {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = '⚠️ الرجاء إدخال كلمة السر';
+      return;
+    }
+
+    if (password !== confirm) {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = '❌ كلمة السر غير متطابقة';
+      return;
+    }
+
+    if (password.length < 4) {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = '⚠️ كلمة السر يجب أن تكون 4 أحرف على الأقل';
+      return;
+    }
+
+    responseDiv.className = 'cmd-response loading';
+    responseDiv.innerHTML = '⏳ جاري تعيين كلمة السر...';
+
+    fetch('/set_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: device,
+        password: password
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        responseDiv.className = 'cmd-response success';
+        responseDiv.innerHTML = `✅ تم تعيين كلمة السر <strong>"${password}"</strong> للجهاز <strong>${device}</strong>`;
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('passwordConfirm').value = '';
+        setTimeout(() => {
+          responseDiv.className = 'cmd-response';
+          responseDiv.innerHTML = '';
+        }, 5000);
+      } else {
+        throw new Error(data.msg || 'فشل التعيين');
+      }
+    })
+    .catch(error => {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = `❌ خطأ: ${error.message}`;
+    });
+  }
+
+  function clearPassword() {
+    const device = document.getElementById('passwordDeviceSelect').value;
+    const responseDiv = document.getElementById('passwordResponse');
+
+    if (!confirm('⚠️ هل أنت متأكد من مسح كلمة السر؟')) {
+      return;
+    }
+
+    responseDiv.className = 'cmd-response loading';
+    responseDiv.innerHTML = '⏳ جاري مسح كلمة السر...';
+
+    fetch('/clear_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: device
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        responseDiv.className = 'cmd-response success';
+        responseDiv.innerHTML = `✅ تم مسح كلمة السر للجهاز <strong>${device}</strong>`;
+        setTimeout(() => {
+          responseDiv.className = 'cmd-response';
+          responseDiv.innerHTML = '';
+        }, 5000);
+      } else {
+        throw new Error(data.msg || 'فشل المسح');
+      }
+    })
+    .catch(error => {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = `❌ خطأ: ${error.message}`;
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     const select = document.getElementById('deviceSelect');
-    if (select.options.length === 2) { // option all + جهاز واحد
+    if (select.options.length === 2) {
       select.selectedIndex = 1;
+    }
+    const pwdSelect = document.getElementById('passwordDeviceSelect');
+    if (pwdSelect.options.length === 2) {
+      pwdSelect.selectedIndex = 1;
     }
   });
 </script>
